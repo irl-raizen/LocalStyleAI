@@ -1,36 +1,97 @@
-# 🎨 LocalStyleAI
+<p align="center">
+  <h1 align="center">🎨 Local Style AI Generator</h1>
+  <p align="center">
+    <strong>Train and generate styled images locally using Stable Diffusion + LoRA</strong>
+  </p>
+  <p align="center">
+    <a href="#features">Features</a> •
+    <a href="#tech-stack">Tech Stack</a> •
+    <a href="#installation">Installation</a> •
+    <a href="#usage">Usage</a> •
+    <a href="#dataset-setup">Dataset</a> •
+    <a href="#api-reference">API</a>
+  </p>
+</p>
 
-**LocalStyleAI** is a locally-run AI image stylization system powered by Stable Diffusion and custom-trained LoRA adapters. Generate anime, Ghibli, lineart, and more — entirely on your own machine with no cloud dependencies.
+---
+
+## 📖 About
+
+**Local Style AI Generator** is a fully local, GPU-accelerated image generation system that lets you **train custom art styles** and **generate images** — all on your own machine with no cloud dependency.
+
+Train LoRA adapters on your own image datasets to teach the model new art styles (anime, Ghibli, line art, or anything you want), then generate images through a CLI, Python API, or a sleek web interface.
+
+Optimized to run on **consumer GPUs with as little as 4 GB VRAM** (RTX 3050+).
 
 ---
 
 ## ✨ Features
 
-- 🖼️ **Multi-style image generation** — anime, Ghibli, lineart, and custom styles
-- 🧠 **Custom LoRA training** — train your own style adapters on local datasets
-- ⚡ **Low-VRAM optimized** — runs on GPUs with as little as 4GB VRAM (RTX 3050+)
-- 🌐 **REST API server** — FastAPI backend with a built-in web UI
-- 🔼 **Built-in upscaling** — Real-ESRGAN upscaler for high-resolution outputs
+| Feature | Description |
+|---|---|
+| 🖼️ **Multi-style Generation** | Anime, Studio Ghibli, line art — or train your own |
+| 🧠 **Custom LoRA Training** | Train style adapters on small datasets (~20-50 images) |
+| ⚡ **Low-VRAM Optimized** | Runs on 4 GB GPUs with CPU offloading & attention slicing |
+| 🌐 **REST API + Web UI** | FastAPI backend with a built-in glassmorphism web interface |
+| 🔼 **Real-ESRGAN Upscaling** | 2× upscaling built in for high-resolution outputs |
+| 📦 **Single Entry Point** | `run.py` for training, generation, dataset prep, and server |
 
 ---
 
-## 🗂️ Project Structure
+## 🛠️ Tech Stack
+
+| Component | Technology |
+|---|---|
+| Base Model | Stable Diffusion v1.5 / DreamShaper 8 |
+| Fine-tuning | LoRA via PEFT |
+| ML Framework | PyTorch 2.1 + CUDA 11.8 |
+| Diffusion Library | Hugging Face Diffusers |
+| API Server | FastAPI + Uvicorn |
+| Upscaling | Real-ESRGAN |
+| Frontend | Vanilla HTML/CSS/JS with glassmorphism design |
+
+---
+
+## 📁 Project Structure
 
 ```
 LocalStyleAI/
+├── src/
+│   ├── train/
+│   │   └── train_lora.py         # LoRA training pipeline
+│   ├── inference/
+│   │   └── generate.py           # Image generation module
+│   ├── data/
+│   │   └── dataset_prep.py       # Dataset processing & manifest creation
+│   └── utils/
+│       └── helpers.py            # Shared constants, logging, model loader
+│
+├── api/
+│   ├── app.py                    # FastAPI server
+│   └── static/
+│       └── index.html            # Web UI
+│
+├── configs/
+│   └── anime_dataset.toml        # Kohya-ss training config
+│
 ├── scripts/
-│   ├── server.py          # FastAPI inference server
-│   └── index.html         # Web UI frontend
-├── data/
-│   ├── anime_clean/       # Training images for anime style
-│   ├── ghibli_clean/      # Training images for Ghibli style
-│   └── lineart_clean/     # Training images for lineart style
-├── loras/                 # Trained LoRA weights (generated after training)
-├── exports/               # Generated image outputs
-├── train_lora.py          # LoRA training script
-├── dataset_prep.py        # Dataset preparation and captioning
-├── upscale.py             # Real-ESRGAN upscaling script
-├── requirements.txt       # Python dependencies
+│   └── prepare_kohya_data.py     # Caption file generator for kohya-ss
+│
+├── tests/
+│   ├── test_model.py             # Model loading & generation tests
+│   └── test_gen.py               # API server endpoint tests
+│
+├── data/                         # Training images (not tracked by git)
+│   ├── anime_clean/
+│   ├── ghibli_clean/
+│   └── lineart_clean/
+│
+├── loras/                        # Trained LoRA weights (generated)
+├── exports/                      # Generated image outputs
+│
+├── run.py                        # 🚀 Main entry point
+├── requirements.txt
+├── .gitignore
 └── README.md
 ```
 
@@ -40,14 +101,14 @@ LocalStyleAI/
 
 ### Prerequisites
 
-- Python 3.10+
-- NVIDIA GPU with 4GB+ VRAM (RTX 2060+ recommended)
-- CUDA 11.8 or 12.1 installed
+- **Python** 3.10+
+- **NVIDIA GPU** with 4 GB+ VRAM (RTX 2060+ recommended)
+- **CUDA** 11.8 or 12.1
 
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/LocalStyleAI.git
+git clone https://github.com/irl-raizen/LocalStyleAI.git
 cd LocalStyleAI
 ```
 
@@ -55,8 +116,10 @@ cd LocalStyleAI
 
 ```bash
 python -m venv venv
+
 # Windows
 venv\Scripts\activate
+
 # Linux / macOS
 source venv/bin/activate
 ```
@@ -67,83 +130,92 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-> **Note:** The `torch` package above uses CUDA 11.8 (`cu118`). If you have CUDA 12.1, install PyTorch separately:
+> **Note (CUDA 12.1 users):** Replace the PyTorch install:
 > ```bash
-> pip install torch==2.1.2+cu121 torchvision==0.16.2+cu121 --index-url https://download.pytorch.org/whl/cu121
+> pip install torch==2.1.2+cu121 torchvision==0.16.2+cu121 \
+>     --index-url https://download.pytorch.org/whl/cu121
 > ```
 
 ---
 
-## 🚀 Running the Server
+## 🚀 Usage
+
+All operations go through the unified `run.py` entry point:
+
+### Generate an image
 
 ```bash
-uvicorn scripts.server:app --host 0.0.0.0 --port 8000
+python run.py --mode generate --prompt "a sunset over the ocean" --style ghibli_clean
 ```
 
-Then open your browser at **http://localhost:8000** to access the web UI.
+### Train a LoRA adapter
 
-### API Endpoints
+```bash
+python run.py --mode train --style anime_clean --steps 1200 --lr 2e-5
+```
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/generate` | POST | Generate an image from a prompt |
-| `/styles` | GET | List available styles / LoRAs |
-| `/upscale` | POST | Upscale a generated image |
+### Prepare a dataset
+
+```bash
+python run.py --mode prepare
+```
+
+### Start the API server
+
+```bash
+python run.py --mode server --port 8000
+```
+
+Then open **http://localhost:8000** for the web UI.
 
 ---
 
-## 🏋️ Training a LoRA
+## 🗂️ Dataset Setup
 
-### 1. Prepare your dataset
-
-Place your training images inside:
+Place your training images in style-specific subdirectories:
 
 ```
 data/
-└── <style_name>/          # e.g. data/anime_clean/
-    ├── image_001.jpg
-    ├── image_002.jpg
-    └── ...
+├── anime_clean/       # 20-50 anime-style images
+│   ├── img_001.png
+│   ├── img_002.jpg
+│   └── ...
+├── ghibli_clean/      # 20-50 Ghibli-style images
+└── lineart_clean/     # 20-50 line art images
 ```
 
-Then run the dataset preparation script to auto-caption images:
+**Supported formats:** `.png`, `.jpg`, `.jpeg`, `.webp`
+**Minimum size:** 200×200 pixels (auto-resized to 512×512)
+
+Then run the dataset preparation:
 
 ```bash
-python dataset_prep.py
+python run.py --mode prepare
 ```
 
-### 2. Start training
-
-```bash
-python train_lora.py
-```
-
-Training configuration (rank, learning rate, steps, etc.) can be edited at the top of `train_lora.py`.
-
-Trained LoRA weights will be saved to `loras/<style_name>/`.
+This validates images, resizes them, and generates a `manifest.jsonl` for training.
 
 ---
 
-## 🖼️ Generating Images
+## 🌐 API Reference
 
-### Via the Web UI
+Start the server with `python run.py --mode server`, then:
 
-1. Start the server (see above)
-2. Open **http://localhost:8000**
-3. Enter a prompt, select a style, and hit **Generate**
+| Endpoint | Method | Description |
+|---|---|---|
+| `/` | GET | Web UI |
+| `/health` | GET | Health check — `{"status": "ok", "gpu": true}` |
+| `/styles` | GET | List available styles |
+| `/generate` | POST | Generate an image (form: `prompt`, `style`) |
 
-### Via the API
+### Example: Generate via API
 
 ```python
 import requests
 
-response = requests.post("http://localhost:8000/generate", json={
-    "prompt": "a girl in anime style, detailed, vibrant colors",
-    "style": "anime",
-    "steps": 30,
-    "guidance_scale": 7.5,
-    "width": 512,
-    "height": 512
+response = requests.post("http://localhost:8000/generate", data={
+    "prompt": "a girl in anime style, vibrant colors",
+    "style": "anime_clean",
 })
 
 with open("output.png", "wb") as f:
@@ -152,36 +224,48 @@ with open("output.png", "wb") as f:
 
 ---
 
-## 🔼 Upscaling Images
+## 🖼️ Example Outputs
 
-```bash
-python upscale.py --input exports/output.png --output exports/output_4x.png --scale 4
-```
-
----
-
-## 🛠️ Configuration
-
-The server automatically selects a base model in this priority order:
-1. **DreamShaper** (if present in Hugging Face cache)
-2. **Realistic Vision**
-3. **Stable Diffusion v1.5** (fallback)
-
-LoRA weights in `loras/<style>/` are loaded automatically when a style is selected.
-
----
-
-## 📋 Requirements Overview
-
-| Package | Version | Purpose |
+| Anime Style | Ghibli Style | Line Art |
 |---|---|---|
-| torch | 2.1.2 | Deep learning backend |
-| diffusers | 0.25.1 | Stable Diffusion pipeline |
-| transformers | 4.37.2 | Text encoder |
-| accelerate | 0.26.1 | Training acceleration |
-| peft | ≥0.7.0 | LoRA adapter support |
-| fastapi | ≥0.108.0 | API server |
-| Real-ESRGAN | latest | Image upscaling |
+| *anime_clean* | *ghibli_clean* | *lineart_clean* |
+| Cel shaded, vibrant | Hand painted, watercolor | Ink drawing, B&W |
+
+> Generate your own samples with:
+> ```bash
+> python run.py --mode generate --prompt "a dragon" --style lineart_clean
+> ```
+
+---
+
+## 📋 Commands Quick Reference
+
+| Command | What it does |
+|---|---|
+| `python run.py --mode generate --prompt "..." --style anime_clean` | Generate a styled image |
+| `python run.py --mode train --style ghibli_clean` | Train a LoRA on Ghibli data |
+| `python run.py --mode prepare` | Process training images |
+| `python run.py --mode server` | Launch the web API |
+| `python tests/test_model.py` | Test model loading & generation |
+| `python tests/test_gen.py` | Test API endpoints |
+
+---
+
+## 🔧 Configuration
+
+**Base model priority** (auto-selected):
+1. DreamShaper 8
+2. Realistic Vision V5.1
+3. Stable Diffusion v1.5
+
+**LoRA training defaults:**
+- Rank: 8
+- Alpha: 32
+- Target modules: `to_q`, `to_v`, `to_k`, `to_out.0`
+- Learning rate: 2e-5
+- Steps: 1200
+
+All configurable via CLI arguments.
 
 ---
 
@@ -191,8 +275,9 @@ MIT License — free to use, modify, and distribute.
 
 ---
 
-## 🙏 Credits
+## 🙏 Acknowledgements
 
 - [Hugging Face Diffusers](https://github.com/huggingface/diffusers)
-- [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)
 - [PEFT / LoRA](https://github.com/huggingface/peft)
+- [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)
+- [DreamShaper](https://civitai.com/models/4384/dreamshaper)

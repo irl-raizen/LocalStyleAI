@@ -5,5 +5,5 @@ batch_size = 1
 
 [[datasets]]
 [[datasets.subsets]]
-image_dir = "d:/AI/my_ai/data/anime_clean"
+image_dir = "./data/anime_clean"
 num_repeats = 10
