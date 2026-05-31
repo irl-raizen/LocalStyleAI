@@ -215,6 +215,20 @@ A closed-loop image quality system that evaluates generated images against the o
 
 ---
 
+## 🖌️ Scene Editing & Intelligent Inpainting (Phase 6)
+
+Modify existing generated images through natural language instructions without regenerating the entire image.
+
+### Features
+1. **Edit Interpreter**: Powered by Ollama, converts conversational instructions (e.g., *"Make dragon larger"* or *"Add snowfall"*) into structured actionable edit plans.
+2. **Intelligent Inpainting**: Automatically routes edits to FLUX img2img, SDXL Inpainting, or SD1.5 Inpainting depending on your active model.
+3. **Region Selector**: Dynamically isolates the object or environment to edit. 
+4. **Edit Vision Critic Verification**: The Vision Critic evaluates the final edit to ensure it actually matches your instruction before presenting it.
+
+You can edit images directly from the main Web UI by scrolling down to the **Scene Editor**.
+
+---
+
 ## 🖼️ Image Generation Models
 
 LocalStyleAI supports multiple backend models through a robust `ModelRouter`.
@@ -325,6 +339,8 @@ Start the server with `python run.py --mode server`, then:
 | `/memory/styles` | GET | Get stored styles |
 | `/debug/critic` | GET | Get active vision critic model status |
 | `/debug/evaluate` | POST | Evaluate an image upload against a text prompt |
+| `/edit` | POST | Edit an existing image (form: `instruction`, `image`) |
+| `/debug/edit` | POST | Debug edit interpretation plan |
 
 ### Example: Generate via API
 

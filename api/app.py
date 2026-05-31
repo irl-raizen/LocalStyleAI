@@ -250,6 +250,56 @@ async def debug_evaluate(prompt: str = Form(...), image: UploadFile = File(...))
         return JSONResponse({"error": str(e)}, status_code=500)
 
 # ---------------------------------------------------------------------------
+# Edit Endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/edit")
+async def edit_image(instruction: str = Form(...), image: UploadFile = File(...)):
+    """Edit an existing image based on a natural language instruction."""
+    try:
+        from src.editing.edit_manager import EditManager
+        img = PILImage.open(image.file).convert("RGB")
+        manager = EditManager()
+        
+        edited_img, metadata = manager.process_edit(img, instruction)
+        
+        buf = BytesIO()
+        edited_img.save(buf, format="PNG")
+        buf.seek(0)
+        
+        headers = {
+            "X-Edit-Critic-Score": str(metadata.get("critic_score", "")),
+            "X-Edit-Mask-Confidence": str(metadata.get("mask_confidence", "")),
+            "X-Edit-Target": str(metadata.get("target", "")),
+            "X-Edit-Action": str(metadata.get("action", ""))
+        }
+        
+        return StreamingResponse(buf, media_type="image/png", headers=headers)
+    except Exception as e:
+        logger.error("Edit failed: %s", e)
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.post("/debug/edit")
+async def debug_edit(instruction: str = Form(...), image: UploadFile = File(...)):
+    """Debug edit processing steps."""
+    try:
+        from src.editing.edit_manager import EditManager
+        img = PILImage.open(image.file).convert("RGB")
+        manager = EditManager()
+        
+        _, metadata = manager.process_edit(img, instruction)
+        
+        return JSONResponse({
+            "scene_analysis": metadata.get("scene_analysis", {}),
+            "edit_plan": metadata.get("edit_plan", {}),
+            "mask_found": True,
+            "confidence": metadata.get("mask_confidence", 0.0)
+        })
+    except Exception as e:
+        logger.error("Debug edit failed: %s", e)
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+# ---------------------------------------------------------------------------
 # Direct execution
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":

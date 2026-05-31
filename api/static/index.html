@@ -243,6 +243,24 @@
             <button onclick="generate()" id="gen-btn">
                 Generate Image
             </button>
+            
+            <hr style="border: none; border-top: 1px solid var(--border-color); margin: 2rem 0;">
+            
+            <h2 style="font-size: 1.25rem; margin-top: 0;">Scene Editor (Phase 6)</h2>
+            <div class="form-group">
+                <label for="edit-image">Upload Existing Image</label>
+                <input type="file" id="edit-image" accept="image/*" style="display: block; width: 100%; padding: 0.75rem; background: rgba(0,0,0,0.2); border-radius: 8px;">
+            </div>
+            <div class="form-group">
+                <label for="edit-instruction">Edit Instruction</label>
+                <input type="text" id="edit-instruction" placeholder="e.g. Make dragon larger" value="">
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
+                    Examples: "Add snowfall", "Change sky to sunset", "Remove tree", "Replace sword with axe"
+                </p>
+            </div>
+            <button onclick="editImage()" id="edit-btn" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                Edit Image
+            </button>
         </div>
 
         <div class="card result-section">
@@ -330,12 +348,99 @@
                 } else {
                     showError(`Error: ${response.statusText}`);
                 }
-            } catch (e) {
-                showError(`Error: ${e.message}`);
+            } catch (error) {
+                showError(`Request failed: ${error.message}`);
             } finally {
+                btn.textContent = 'Generate Image';
                 btn.disabled = false;
-                btn.innerText = 'Generate Image';
                 loading.style.display = 'none';
+            }
+        }
+
+        async function editImage() {
+            const fileInput = document.getElementById('edit-image');
+            const instruction = document.getElementById('edit-instruction').value;
+            const btn = document.getElementById('edit-btn');
+            const resultArea = document.getElementById('result-area');
+
+            if (!fileInput.files.length) {
+                showError("Please upload an image to edit.");
+                return;
+            }
+            if (!instruction) {
+                showError("Please provide an edit instruction.");
+                return;
+            }
+
+            btn.textContent = 'Analyzing and Editing...';
+            btn.disabled = true;
+            resultArea.innerHTML = '<div class="loader"></div><p style="margin-top: 1rem; color: var(--text-muted)">Interpreting instruction and inpainting region...</p>';
+
+            try {
+                const formData = new FormData();
+                formData.append("instruction", instruction);
+                formData.append("image", fileInput.files[0]);
+
+                const response = await fetch('/edit', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                resultArea.innerHTML = '';
+
+                if (response.ok) {
+                    const criticScore = response.headers.get("X-Edit-Critic-Score");
+                    const target = response.headers.get("X-Edit-Target");
+                    const action = response.headers.get("X-Edit-Action");
+                    const confidence = response.headers.get("X-Edit-Mask-Confidence");
+
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    
+                    // Show original and edited side by side
+                    const wrapper = document.createElement('div');
+                    wrapper.style.display = 'grid';
+                    wrapper.style.gridTemplateColumns = '1fr 1fr';
+                    wrapper.style.gap = '1rem';
+                    
+                    const origImg = document.createElement('img');
+                    origImg.src = URL.createObjectURL(fileInput.files[0]);
+                    origImg.alt = "Original Image";
+                    
+                    const newImg = document.createElement('img');
+                    newImg.src = url;
+                    newImg.alt = "Edited Image";
+                    
+                    wrapper.appendChild(origImg);
+                    wrapper.appendChild(newImg);
+                    resultArea.appendChild(wrapper);
+                    
+                    const metaDiv = document.createElement('div');
+                    metaDiv.style.marginTop = '1rem';
+                    metaDiv.style.padding = '1rem';
+                    metaDiv.style.background = 'rgba(0,0,0,0.2)';
+                    metaDiv.style.borderRadius = '8px';
+                    metaDiv.style.width = '100%';
+                    metaDiv.style.boxSizing = 'border-box';
+                    metaDiv.innerHTML = `
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">
+                            <div><b>Instruction:</b> ${instruction}</div>
+                            <div><b>Action:</b> ${action}</div>
+                            <div><b>Target:</b> ${target}</div>
+                            <div><b>Mask Confidence:</b> ${Math.round(parseFloat(confidence)*100) || 0}%</div>
+                            <div><b>Critic Score:</b> ${Math.round(parseFloat(criticScore)*100) || 0}%</div>
+                        </div>
+                    `;
+                    resultArea.appendChild(metaDiv);
+                } else {
+                    const data = await response.json();
+                    showError(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                showError(`Request failed: ${error.message}`);
+            } finally {
+                btn.textContent = 'Edit Image';
+                btn.disabled = false;
             }
         }
 
