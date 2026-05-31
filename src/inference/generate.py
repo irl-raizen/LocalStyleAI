@@ -22,6 +22,8 @@ from src.ai.prompt_enhancer import enhance_prompt, DEFAULT_NEGATIVE_PROMPT
 from src.ai.prompt_structurer import structure_prompt
 from src.ai.prompt_composer import compose_prompt
 from src.memory.memory_engine import MemoryEngine
+from src.critic.regeneration_manager import RegenerationManager
+import json
 
 logger = get_logger("inference")
 
@@ -35,7 +37,7 @@ def generate_image(
     height: int = 512,
     output_path: str | None = None,
     pipe=None,
-) -> Image.Image:
+) -> tuple[Image.Image, dict]:
     """
     Generate a single image from a text prompt with optional style LoRA.
 
@@ -50,7 +52,7 @@ def generate_image(
         router:         Optionally pass a ModelRouter to avoid reloading.
 
     Returns:
-        PIL.Image — the generated image.
+        (PIL.Image, dict) — the generated image and evaluation metadata.
     """
     device = get_device()
 
@@ -104,22 +106,43 @@ def generate_image(
     logger.info("Negative: '%s'", negative_prompt)
 
     logger.info("Generation started")
-    image = router.generate(
-        prompt=full_prompt,
-        negative_prompt=negative_prompt if negative_prompt else None,
-        steps=steps,
-        width=width,
-        height=height,
-    )
+    
+    # Phase 5: Vision Critic Auto-Regeneration
+    regen_manager = RegenerationManager()
+    
+    def _do_generate(current_prompt, **kwargs):
+        return router.generate(
+            prompt=current_prompt,
+            negative_prompt=negative_prompt if negative_prompt else None,
+            steps=steps,
+            width=width,
+            height=height,
+        )
+        
+    image, metadata = regen_manager.run_generation_loop(_do_generate, full_prompt)
+    
+    # Add router info to metadata
+    metadata["model"] = router.active_model_name
+    from src.critic.critic_models import CriticFactory
+    critic = CriticFactory.get_critic()
+    metadata["critic_model"] = critic.model_name if critic else "none"
+    metadata["prompt"] = full_prompt
+
     logger.info("Generation completed")
 
     # Save if output path provided
     if output_path:
         os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
         image.save(output_path)
-        logger.info("Saved: %s", output_path)
+        
+        # Save metadata alongside image
+        meta_path = os.path.splitext(output_path)[0] + ".json"
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=4)
+            
+        logger.info("Saved: %s (and metadata)", output_path)
 
-    return image
+    return image, metadata
 
 
 def generate_style_samples(styles: list[str] | None = None, images_per_style: int = 1):

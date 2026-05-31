@@ -293,12 +293,40 @@
                 });
 
                 if (response.ok) {
+                    const score = response.headers.get("X-Critic-Score");
+                    const promptMatch = response.headers.get("X-Critic-Prompt-Match");
+                    const styleMatch = response.headers.get("X-Critic-Style-Match");
+                    const attempts = response.headers.get("X-Critic-Attempts");
+                    const model = response.headers.get("X-Model");
+                    const criticModel = response.headers.get("X-Critic-Model");
+
                     const blob = await response.blob();
                     const url = URL.createObjectURL(blob);
                     const img = document.createElement('img');
                     img.src = url;
                     img.alt = "Generated Image";
                     resultArea.appendChild(img);
+                    
+                    if (score) {
+                        const metaDiv = document.createElement('div');
+                        metaDiv.style.marginTop = '1rem';
+                        metaDiv.style.padding = '1rem';
+                        metaDiv.style.background = 'rgba(0,0,0,0.2)';
+                        metaDiv.style.borderRadius = '8px';
+                        metaDiv.style.width = '100%';
+                        metaDiv.style.boxSizing = 'border-box';
+                        metaDiv.innerHTML = `
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">
+                                <div><b>Prompt Match:</b> ${Math.round(parseFloat(promptMatch)*100) || 0}%</div>
+                                <div><b>Style Match:</b> ${Math.round(parseFloat(styleMatch)*100) || 0}%</div>
+                                <div><b>Attempts:</b> ${attempts}</div>
+                                <div><b>Overall Score:</b> ${Math.round(parseFloat(score)*100) || 0}%</div>
+                                <div><b>Model:</b> ${model}</div>
+                                <div><b>Critic:</b> ${criticModel}</div>
+                            </div>
+                        `;
+                        resultArea.appendChild(metaDiv);
+                    }
                 } else {
                     showError(`Error: ${response.statusText}`);
                 }

@@ -140,7 +140,7 @@ async def generate(prompt: str = Form(...), style: str = Form("default")):
         logger.info("Request — prompt='%s...' style='%s'", prompt[:50], style)
         from src.inference.generate import generate_image
         
-        img = generate_image(
+        img, metadata = generate_image(
             prompt=prompt,
             style=style,
             steps=None,
@@ -152,7 +152,17 @@ async def generate(prompt: str = Form(...), style: str = Form("default")):
         buf = BytesIO()
         img.save(buf, format="PNG")
         buf.seek(0)
-        return StreamingResponse(buf, media_type="image/png")
+        
+        headers = {
+            "X-Critic-Score": str(metadata.get("overall_score", "")),
+            "X-Critic-Prompt-Match": str(metadata.get("prompt_match", "")),
+            "X-Critic-Style-Match": str(metadata.get("style_match", "")),
+            "X-Critic-Attempts": str(metadata.get("attempts", "")),
+            "X-Model": str(metadata.get("model", "")),
+            "X-Critic-Model": str(metadata.get("critic_model", ""))
+        }
+        
+        return StreamingResponse(buf, media_type="image/png", headers=headers)
 
     except Exception as e:
         logger.error("Generation failed: %s", e, exc_info=True)
@@ -201,6 +211,43 @@ async def get_scenes():
     """Get all stored scenes."""
     engine = MemoryEngine()
     return JSONResponse({"scenes": engine.get_all_scenes()})
+
+# ---------------------------------------------------------------------------
+# Critic Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/debug/critic")
+async def debug_critic():
+    """Inspect the active Vision Critic model."""
+    from src.critic.critic_models import CriticFactory
+    critic = CriticFactory.get_critic()
+    if critic:
+        return JSONResponse({
+            "critic_model": critic.model_name,
+            "loaded": critic.is_loaded,
+            "device": str(critic.device)
+        })
+    return JSONResponse({"critic_model": "none", "loaded": False, "device": "none"})
+
+from fastapi import UploadFile, File
+from PIL import Image as PILImage
+
+@app.post("/debug/evaluate")
+async def debug_evaluate(prompt: str = Form(...), image: UploadFile = File(...)):
+    """Evaluate an image against a prompt."""
+    try:
+        from src.critic.prompt_matcher import evaluate_image_against_prompt
+        img = PILImage.open(image.file).convert("RGB")
+        eval_result = evaluate_image_against_prompt(img, prompt)
+        
+        return JSONResponse({
+            "overall_score": eval_result.get("overall_score"),
+            "missing_elements": eval_result.get("missing_elements", []),
+            "detected_objects": eval_result.get("matched_elements", [])
+        })
+    except Exception as e:
+        logger.error("Evaluate failed: %s", e)
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 # ---------------------------------------------------------------------------
 # Direct execution

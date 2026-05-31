@@ -195,6 +195,26 @@ You can view and manage stored memories at the **Memory Manager UI**: `http://lo
 
 ---
 
+## 👁️ Vision Critic & Auto-Regeneration (Phase 5)
+
+A closed-loop image quality system that evaluates generated images against the original user intent and automatically improves poor results.
+
+### Features
+1. **Vision Critic Models**: Uses `google/siglip-base-patch16-224` (or `openai/clip-vit-base-patch32`) to "look" at the generated image and compare it with the prompt. 
+2. **Prompt Matcher**: Extracts key objects from the prompt and asks the Vision Critic if they are present in the image.
+3. **Auto-Regeneration Loop**: If the image fails the quality threshold or misses key elements, the system automatically appends repair hints (e.g., `IMPORTANT: Clearly visible red dragon`) and regenerates up to 3 times.
+4. **Metadata Storage**: Saves execution metrics (score, attempts, critic model) inside the image headers and alongside the image as a JSON file.
+
+### Configuration
+
+| Environment Variable | Default Value | Description |
+|---|---|---|
+| `VISION_MODEL` | `siglip` | Which vision critic to use (`siglip` or `clip`) |
+| `MAX_REGEN_ATTEMPTS` | `3` | Maximum regeneration retries |
+| `MIN_ACCEPTABLE_SCORE`| `0.75` | Minimum overall visual score to accept immediately |
+
+---
+
 ## 🖼️ Image Generation Models
 
 LocalStyleAI supports multiple backend models through a robust `ModelRouter`.
@@ -303,6 +323,8 @@ Start the server with `python run.py --mode server`, then:
 | `/memory/characters/{name}`| DELETE| Delete a stored character |
 | `/memory/scenes` | GET | Get all stored scenes |
 | `/memory/styles` | GET | Get stored styles |
+| `/debug/critic` | GET | Get active vision critic model status |
+| `/debug/evaluate` | POST | Evaluate an image upload against a text prompt |
 
 ### Example: Generate via API
 
