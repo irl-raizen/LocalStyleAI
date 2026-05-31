@@ -152,11 +152,16 @@ This project features an AI-powered prompt enhancement layer that expands simple
 
 ### How It Works
 
-When generating an image, the prompt is intercepted and sent to the local LLM along with the requested style. The LLM returns a structured JSON response containing:
-- **`enhanced_prompt`**: The original prompt expanded with visual details, lighting, composition, and style-appropriate elements.
-- **`negative_prompt`**: A style-appropriate negative prompt.
+This system uses a **Structured Prompt Architecture** (Phase 2):
 
-If Ollama is unavailable or times out, the system automatically falls back to the original prompt and a default negative prompt to ensure image generation never crashes.
+1. **User Prompt**: The user inputs a simple text query (e.g. `"a samurai standing in rain"`).
+2. **Prompt Analyzer**: Connects to the local LLM to extract semantic fields into a structured JSON schema:
+   - `subject`, `appearance`, `action`, `environment`, `lighting`, `camera`, `style`, `mood`, `quality`.
+   - Also supports future fields for character traits, pose, and custom color palettes.
+3. **Prompt Composer**: Converts the structured components into an optimized, comma-separated diffusion prompt.
+4. **Stable Diffusion**: Receives the final composed prompt for high-fidelity generation.
+
+If structured extraction fails (e.g., if Ollama is unavailable or times out), the system automatically falls back to the Phase 1 prompt enhancer or style prefixing to ensure generation never crashes.
 
 ### Configuration
 
@@ -245,6 +250,7 @@ Start the server with `python run.py --mode server`, then:
 | `/health` | GET | Health check — `{"status": "ok", "gpu": true}` |
 | `/styles` | GET | List available styles |
 | `/generate` | POST | Generate an image (form: `prompt`, `style`) |
+| `/debug/prompt` | GET | Debug structured prompt components (query: `prompt`, `style`) |
 
 ### Example: Generate via API
 
