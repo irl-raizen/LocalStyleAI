@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Dashboard - LocalStyleAI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --primary-color: #6366f1;
+            --primary-hover: #4f46e5;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: rgba(148, 163, 184, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 2rem;
+            background-image: radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
+                              radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.1) 0px, transparent 50%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2rem;
+        }
+
+        .header {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0;
+        }
+
+        a.nav-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        h2 {
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            font-size: 1.25rem;
+            color: #e2e8f0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.2rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        input[type="text"], select {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: white;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .job-card {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 0.5rem;
+        }
+
+        .job-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .status-badge {
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .job-log {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Training Dashboard</h1>
+            <a href="/assets_ui" class="nav-link">Asset Studio &rarr;</a>
+        </div>
+
+        <div class="card">
+            <h2>New Training Job</h2>
+            <form id="train-form" onsubmit="startTraining(event)">
+                <div class="form-group">
+                    <label for="asset-name">Asset Name</label>
+                    <input type="text" id="asset-name" required placeholder="e.g. Sarah">
+                </div>
+                <div class="form-group">
+                    <label for="asset-type">Asset Type</label>
+                    <select id="asset-type" required>
+                        <option value="character">Character</option>
+                        <option value="style">Style</option>
+                        <option value="product">Product</option>
+                        <option value="environment">Environment</option>
+                        <option value="object">Object</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="dataset-path">Dataset Absolute Path</label>
+                    <input type="text" id="dataset-path" required placeholder="C:\datasets\sarah">
+                </div>
+                <div class="form-group">
+                    <label for="tags">Tags (comma separated)</label>
+                    <input type="text" id="tags" placeholder="red hair, leather jacket, cyberpunk">
+                </div>
+                <button type="submit" id="train-btn">Start Training</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Active Jobs</h2>
+            <div id="jobs-container">
+                <div style="color: var(--text-muted); font-style: italic; font-size: 0.9rem;">Loading jobs...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function getStatusColor(status) {
+            if (status === 'Completed') return 'var(--success-color)';
+            if (status === 'Failed') return 'var(--danger-color)';
+            if (status === 'Training') return 'var(--primary-color)';
+            return 'var(--warning-color)';
+        }
+
+        async function loadJobs() {
+            try {
+                const res = await fetch('/training/jobs');
+                const data = await res.json();
+                const container = document.getElementById('jobs-container');
+                
+                if (!data.jobs || data.jobs.length === 0) {
+                    container.innerHTML = '<div style="color: var(--text-muted); font-style: italic; font-size: 0.9rem;">No active training jobs.</div>';
+                    return;
+                }
+
+                container.innerHTML = '';
+                // Reverse to show newest first
+                data.jobs.reverse().forEach(job => {
+                    const card = document.createElement('div');
+                    card.className = 'job-card';
+                    const lastLog = job.logs.length > 0 ? job.logs[job.logs.length - 1] : 'Waiting...';
+                    const progressPct = Math.round(job.progress * 100);
+                    
+                    card.innerHTML = `
+                        <div class="job-header">
+                            <span class="job-title">${job.asset_name} <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted)">(${job.asset_type})</span></span>
+                            <span class="status-badge" style="background: rgba(255,255,255,0.1); color: ${getStatusColor(job.status)}">${job.status}</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${progressPct}%; background: ${getStatusColor(job.status)}"></div>
+                        </div>
+                        <div class="job-log">> ${lastLog}</div>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function startTraining(e) {
+            e.preventDefault();
+            const btn = document.getElementById('train-btn');
+            
+            const formData = new FormData();
+            formData.append('asset_name', document.getElementById('asset-name').value);
+            formData.append('asset_type', document.getElementById('asset-type').value);
+            formData.append('dataset_path', document.getElementById('dataset-path').value);
+            formData.append('tags', document.getElementById('tags').value);
+
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+
+            try {
+                const response = await fetch('/train', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    // Reset form
+                    document.getElementById('train-form').reset();
+                    loadJobs();
+                } else {
+                    const data = await response.json();
+                    alert(`Error: ${data.error || response.statusText}`);
+                }
+            } catch (error) {
+                alert(`Request failed: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Start Training';
+            }
+        }
+
+        // Poll jobs every 2 seconds
+        setInterval(loadJobs, 2000);
+        window.onload = loadJobs;
+    </script>
+</body>
+</html>

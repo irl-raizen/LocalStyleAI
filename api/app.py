@@ -100,6 +100,30 @@ async def memory_ui():
                 return HTMLResponse(content=f.read())
     return HTMLResponse(content="<h1>Memory UI not found.</h1>")
 
+@app.get("/assets_ui", response_class=HTMLResponse)
+async def assets_ui():
+    """Serve the Asset Library UI."""
+    for candidate in [
+        os.path.join(SCRIPT_DIR, "static", "assets.html"),
+        os.path.join(PROJECT_DIR, "api", "static", "assets.html"),
+    ]:
+        if os.path.exists(candidate):
+            with open(candidate, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>Assets UI not found.</h1>")
+
+@app.get("/training_ui", response_class=HTMLResponse)
+async def training_ui():
+    """Serve the Training Dashboard UI."""
+    for candidate in [
+        os.path.join(SCRIPT_DIR, "static", "training.html"),
+        os.path.join(PROJECT_DIR, "api", "static", "training.html"),
+    ]:
+        if os.path.exists(candidate):
+            with open(candidate, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>Training UI not found.</h1>")
+
 @app.get("/styles")
 async def styles():
     """List available styles."""
@@ -298,6 +322,71 @@ async def debug_edit(instruction: str = Form(...), image: UploadFile = File(...)
     except Exception as e:
         logger.error("Debug edit failed: %s", e)
         return JSONResponse({"error": str(e)}, status_code=500)
+
+# ---------------------------------------------------------------------------
+# Training & Asset Endpoints (Phase 7)
+# ---------------------------------------------------------------------------
+
+@app.post("/train")
+async def start_training(
+    dataset_path: str = Form(...),
+    asset_name: str = Form(...),
+    asset_type: str = Form(...),
+    tags: str = Form(default="")
+):
+    from src.training.training_manager import TrainingManager
+    manager = TrainingManager()
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+    job_id = manager.start_training_job(dataset_path, asset_name, asset_type, tag_list)
+    return JSONResponse({"job_id": job_id})
+
+@app.get("/training/jobs")
+async def list_jobs():
+    from src.training.training_queue import TrainingQueue
+    queue = TrainingQueue()
+    return JSONResponse({"jobs": queue.list_jobs()})
+
+@app.get("/training/jobs/{job_id}")
+async def get_job(job_id: str):
+    from src.training.training_queue import TrainingQueue
+    queue = TrainingQueue()
+    job = queue.get_job(job_id)
+    if job:
+        return JSONResponse(job)
+    return JSONResponse({"error": "Not found"}, status_code=404)
+
+@app.get("/assets")
+async def list_assets():
+    from src.assets.asset_registry import AssetRegistry
+    registry = AssetRegistry()
+    return JSONResponse({"assets": [a.model_dump() for a in registry.list_all()]})
+
+@app.get("/assets/{asset_id}")
+async def get_asset(asset_id: str):
+    from src.assets.asset_registry import AssetRegistry
+    registry = AssetRegistry()
+    asset = registry.get(asset_id)
+    if asset:
+        return JSONResponse(asset.model_dump())
+    return JSONResponse({"error": "Not found"}, status_code=404)
+
+@app.delete("/assets/{asset_id}")
+async def delete_asset(asset_id: str):
+    from src.assets.asset_registry import AssetRegistry
+    registry = AssetRegistry()
+    success = registry.delete(asset_id)
+    if success:
+        return JSONResponse({"status": "success"})
+    return JSONResponse({"error": "Not found"}, status_code=404)
+
+@app.post("/assets/search")
+async def search_assets(query: str = Form(default=""), asset_type: str = Form(default=""), tags: str = Form(default="")):
+    from src.assets.asset_registry import AssetRegistry
+    from src.assets.asset_search import AssetSearch
+    searcher = AssetSearch(AssetRegistry())
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+    results = searcher.search(query=query, asset_type=asset_type, tags=tag_list)
+    return JSONResponse({"results": [a.model_dump() for a in results]})
 
 # ---------------------------------------------------------------------------
 # Direct execution

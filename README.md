@@ -229,6 +229,20 @@ You can edit images directly from the main Web UI by scrolling down to the **Sce
 
 ---
 
+## 📦 Asset Studio & Automated Training (Phase 7)
+
+Transform LocalStyleAI into a complete AI asset creation platform. Automatically train, organize, version, and deploy LoRA assets.
+
+### Features
+1. **Asset Registry**: A persistent database tracking all your trained Characters, Styles, Environments, and Objects.
+2. **Automated LoRA Training**: A background queue system that automatically validates your dataset, generates captions using Florence-2/BLIP, and runs Kohya-ss training scripts without blocking the UI.
+3. **Evaluation Engine**: Automatically evaluates trained LoRAs using the Vision Critic and assigns them a quality score.
+4. **Intelligent Generation**: When generating an image, if you mention a registered Character (e.g., "Sarah"), the `ModelRouter` will dynamically load their latest LoRA file behind the scenes!
+
+You can manage your assets via the new **Asset Studio** and **Training Dashboard** pages linked in the UI header.
+
+---
+
 ## 🖼️ Image Generation Models
 
 LocalStyleAI supports multiple backend models through a robust `ModelRouter`.
@@ -341,6 +355,12 @@ Start the server with `python run.py --mode server`, then:
 | `/debug/evaluate` | POST | Evaluate an image upload against a text prompt |
 | `/edit` | POST | Edit an existing image (form: `instruction`, `image`) |
 | `/debug/edit` | POST | Debug edit interpretation plan |
+| `/train` | POST | Start an automated LoRA training job |
+| `/training/jobs` | GET | List all active training jobs |
+| `/assets` | GET | List all registered assets |
+| `/assets/{asset_id}` | GET | Get a specific asset |
+| `/assets/{asset_id}` | DELETE | Delete an asset |
+| `/assets/search` | POST | Search the asset registry |
 
 ### Example: Generate via API
 

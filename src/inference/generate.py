@@ -22,6 +22,7 @@ from src.ai.prompt_enhancer import enhance_prompt, DEFAULT_NEGATIVE_PROMPT
 from src.ai.prompt_structurer import structure_prompt
 from src.ai.prompt_composer import compose_prompt
 from src.memory.memory_engine import MemoryEngine
+from src.assets.asset_registry import AssetRegistry
 from src.critic.regeneration_manager import RegenerationManager
 import json
 
@@ -93,14 +94,29 @@ def generate_image(
             full_prompt = enhanced["enhanced_prompt"]
             negative_prompt = enhanced["negative_prompt"]
 
-    # Load LoRA weights if available
+    # Load LoRA weights if available from style fallback
     lora_path = os.path.join(LORA_DIR, style)
     if style in STYLE_PROMPTS and os.path.isdir(lora_path):
         try:
             backend.pipe.load_lora_weights(lora_path)
-            logger.info("LoRA loaded: %s", style)
+            logger.info("Style LoRA loaded: %s", style)
         except Exception as e:
-            logger.warning("Failed to load LoRA '%s': %s", style, e)
+            logger.warning("Failed to load Style LoRA '%s': %s", style, e)
+            
+    # Phase 7: Memory -> Asset Registry -> LoRA Integration
+    # If the memory engine found a character and we have a trained asset for them, load it!
+    registry = AssetRegistry()
+    assets = registry.list_all()
+    # Find all characters mentioned in the prompt
+    for asset in assets:
+        if asset.asset_type.lower() == "character" and asset.name.lower() in full_prompt.lower():
+            if asset.lora_path and os.path.exists(asset.lora_path):
+                try:
+                    # diffusers handles multiple LoRAs
+                    backend.pipe.load_lora_weights(asset.lora_path)
+                    logger.info("Asset LoRA loaded: %s (%s)", asset.name, asset.version)
+                except Exception as e:
+                    logger.warning("Failed to load Asset LoRA '%s': %s", asset.name, e)
 
     logger.info("Generating — prompt: '%s...'", full_prompt[:60])
     logger.info("Negative: '%s'", negative_prompt)
