@@ -30,99 +30,41 @@ from src.ai.prompt_composer import compose_prompt
 
 logger = get_logger("api")
 
+from src.models.model_router import ModelRouter
+
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
 app = FastAPI(
     title="LocalStyleAI",
-    description="Generate styled images locally using Stable Diffusion + LoRA adapters.",
+    description="Generate styled images locally using multiple backends (SD1.5, SDXL, FLUX).",
     version="1.0.0",
 )
-
-# Global state
-_pipe = None
-_current_lora_style = None
-_base_unet_state = None
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(SCRIPT_DIR)
 
 
-# ---------------------------------------------------------------------------
-# Pipeline management
-# ---------------------------------------------------------------------------
-
-def _get_pipeline():
-    """Lazy-load the Stable Diffusion pipeline and cache it."""
-    global _pipe, _base_unet_state
-    if _pipe is not None:
-        return _pipe
-
-    from diffusers import StableDiffusionPipeline
-    from src.utils.helpers import BASE_MODELS
-
-    device = get_device()
-    dtype = get_dtype(device)
-
-    logger.info("Loading base pipeline...")
-    for model_id in BASE_MODELS:
-        try:
-            logger.info("  Trying: %s ...", model_id)
-            _pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=dtype)
-            logger.info("  ✓ Loaded: %s", model_id)
-            break
-        except Exception as e:
-            logger.warning("  ✗ Failed: %s", e)
-
-    if _pipe is None:
-        raise RuntimeError("All base models failed to load.")
-
-    _pipe = _pipe.to(device)
-    _pipe.safety_checker = None
-
-    if device == "cuda":
-        _pipe.enable_attention_slicing()
-
-    # Cache base UNet on CPU for clean LoRA switching
-    _base_unet_state = {k: v.cpu().clone() for k, v in _pipe.unet.state_dict().items()}
-    logger.info("Pipeline ready on %s.", device)
-    return _pipe
-
-
-def _load_lora(pipeline, style: str):
-    """Load the correct LoRA for a style, restoring base weights first."""
-    global _current_lora_style, _base_unet_state
-
-    if style == "default" or style not in STYLE_PROMPTS:
-        if _current_lora_style is not None:
-            pipeline.unet.load_state_dict(_base_unet_state)
-            _current_lora_style = None
-        return
-
-    if style == _current_lora_style:
-        return
-
-    lora_folder = os.path.join(LORA_DIR, style)
-    peft_file = os.path.join(lora_folder, "adapter_model.safetensors")
-
-    if not os.path.exists(peft_file) and not os.path.isdir(lora_folder):
-        logger.warning("No LoRA weights for '%s'", style)
-        return
-
-    try:
-        pipeline.unet.load_state_dict(_base_unet_state)
-        pipeline.load_lora_weights(lora_folder)
-        _current_lora_style = style
-        logger.info("LoRA '%s' loaded.", style)
-    except Exception as e:
-        logger.error("Failed to load LoRA '%s': %s", style, e)
-        pipeline.unet.load_state_dict(_base_unet_state)
-        _current_lora_style = None
-
 
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+@app.get("/debug/model")
+async def debug_model():
+    """Benchmark endpoint to inspect the active model."""
+    try:
+        router = ModelRouter()
+        backend = router.get_active_backend()
+        return JSONResponse({
+            "active_model": router.active_model_name,
+            "loaded": backend.is_loaded,
+            "device": backend.device,
+            "vram_optimized": True if backend.device == "cuda" else False
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
@@ -183,47 +125,16 @@ async def generate(prompt: str = Form(...), style: str = Form("default")):
     """Generate an image from a text prompt with an optional style."""
     try:
         logger.info("Request — prompt='%s...' style='%s'", prompt[:50], style)
-        pipeline = _get_pipeline()
-
-        _load_lora(pipeline, style)
-
-        # Phase 2: Structured Prompt Extraction
-        structured = structure_prompt(prompt=prompt, style=style)
+        from src.inference.generate import generate_image
         
-        if structured is not None:
-            logger.info("Structured prompt extracted: %s", structured.model_dump())
-            full_prompt = compose_prompt(structured)
-            logger.info("Composed prompt generated: '%s'", full_prompt)
-            negative = STYLE_NEGATIVE_PROMPTS.get(style, DEFAULT_NEGATIVE_PROMPT)
-        else:
-            # Fall back to Phase 1 enhanced prompt system
-            logger.info("Structured prompt extraction failed, falling back to Phase 1 prompt enhancer.")
-            enhanced = enhance_prompt(prompt=prompt, style=style)
-            
-            # Keep original style prefixing fallback logic if Phase 1 also fell back
-            if enhanced["enhanced_prompt"] == prompt:
-                if style in STYLE_PROMPTS:
-                    full_prompt = f"{STYLE_PROMPTS[style]}, {prompt}"
-                    negative = STYLE_NEGATIVE_PROMPTS.get(style, "")
-                else:
-                    full_prompt = prompt
-                    negative = enhanced["negative_prompt"]
-            else:
-                full_prompt = enhanced["enhanced_prompt"]
-                negative = enhanced["negative_prompt"]
-
-        logger.info("Generating...")
-        logger.info("Generation started")
-        result = pipeline(
-            prompt=full_prompt,
-            negative_prompt=negative or None,
-            height=512,
-            width=512,
-            guidance_scale=7.5,
-            num_inference_steps=30,
+        img = generate_image(
+            prompt=prompt,
+            style=style,
+            steps=None,
+            width=None,
+            height=None,
+            guidance_scale=None
         )
-        img = result.images[0]
-        logger.info("Generation completed")
 
         buf = BytesIO()
         img.save(buf, format="PNG")

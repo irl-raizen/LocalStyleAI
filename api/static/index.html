@@ -219,6 +219,7 @@
         <div class="card input-section">
             <h1>LocalStyleAI</h1>
             <p class="subtitle">Generate stunning images locally with custom styles.</p>
+            <p id="model-status" style="color: var(--primary-color); font-weight: 600; font-size: 0.85rem; margin-top: -1.5rem; margin-bottom: 2rem;">Current Model: Loading...</p>
 
             <div class="form-group">
                 <label for="prompt">Prompt</label>
@@ -315,6 +316,23 @@
             p.innerText = msg;
             resultArea.appendChild(p);
         }
+
+        async function fetchModelStatus() {
+            try {
+                const response = await fetch('/debug/model');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('model-status').innerText = `Current Model: ${data.active_model.toUpperCase()}`;
+                } else {
+                    document.getElementById('model-status').innerText = `Current Model: Unknown`;
+                }
+            } catch (e) {
+                console.error("Could not fetch model status", e);
+                document.getElementById('model-status').innerText = `Current Model: Offline`;
+            }
+        }
+
+        window.onload = fetchModelStatus;
     </script>
 </body>
 

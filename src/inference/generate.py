@@ -16,8 +16,8 @@ from src.utils.helpers import (
     EXPORTS_DIR,
     get_device,
     get_logger,
-    load_pipeline,
 )
+from src.models.model_router import ModelRouter
 from src.ai.prompt_enhancer import enhance_prompt, DEFAULT_NEGATIVE_PROMPT
 from src.ai.prompt_structurer import structure_prompt
 from src.ai.prompt_composer import compose_prompt
@@ -46,16 +46,20 @@ def generate_image(
         width:          Output width in pixels (must be multiple of 8).
         height:         Output height in pixels (must be multiple of 8).
         output_path:    If provided, save the image to this path.
-        pipe:           Optionally pass a pre-loaded pipeline to avoid reloading.
+        router:         Optionally pass a ModelRouter to avoid reloading.
 
     Returns:
         PIL.Image — the generated image.
     """
     device = get_device()
 
-    # Load pipeline if not provided
+    # Load router if not provided
     if pipe is None:
-        pipe = load_pipeline(device=device)
+        router = ModelRouter()
+        backend = router.get_active_backend()
+    else:
+        router = pipe
+        backend = router.get_active_backend()
 
     # Phase 2: Structured Prompt Extraction
     structured = structure_prompt(prompt=prompt, style=style)
@@ -86,7 +90,7 @@ def generate_image(
     lora_path = os.path.join(LORA_DIR, style)
     if style in STYLE_PROMPTS and os.path.isdir(lora_path):
         try:
-            pipe.load_lora_weights(lora_path)
+            backend.pipe.load_lora_weights(lora_path)
             logger.info("LoRA loaded: %s", style)
         except Exception as e:
             logger.warning("Failed to load LoRA '%s': %s", style, e)
@@ -95,15 +99,13 @@ def generate_image(
     logger.info("Negative: '%s'", negative_prompt)
 
     logger.info("Generation started")
-    result = pipe(
+    image = router.generate(
         prompt=full_prompt,
         negative_prompt=negative_prompt if negative_prompt else None,
-        num_inference_steps=steps,
-        guidance_scale=guidance_scale,
-        height=height,
+        steps=steps,
         width=width,
+        height=height,
     )
-    image = result.images[0]
     logger.info("Generation completed")
 
     # Save if output path provided
@@ -133,7 +135,7 @@ def generate_style_samples(styles: list[str] | None = None, images_per_style: in
     }
 
     device = get_device()
-    pipe = load_pipeline(device=device)
+    router = ModelRouter()
     os.makedirs(EXPORTS_DIR, exist_ok=True)
 
     for style_name in styles:
@@ -148,7 +150,7 @@ def generate_style_samples(styles: list[str] | None = None, images_per_style: in
                 prompt=subject,
                 style=style_name,
                 output_path=out_path,
-                pipe=pipe,
+                pipe=router,
             )
             logger.info("  [%d/%d] Saved: %s", idx, images_per_style, out_path)
 

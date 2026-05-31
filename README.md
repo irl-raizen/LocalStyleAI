@@ -181,6 +181,38 @@ python run.py --mode server
 
 ---
 
+## 🖼️ Image Generation Models
+
+LocalStyleAI supports multiple backend models through a robust `ModelRouter`.
+
+### Supported Models
+
+- `flux_dev`: High-quality FLUX.1-dev model (default).
+- `flux_schnell`: Fast FLUX.1-schnell model.
+- `sdxl`: Stable Diffusion XL.
+- `sd15`: Stable Diffusion v1.5 (with LoRA support).
+
+### Fallback System
+
+If a model fails to load (e.g. out of memory), the router automatically falls back to a lighter model to ensure generation never crashes:
+`flux_dev` -> `sdxl` -> `sd15`
+
+### Configuration
+
+You can customize the model by setting the `IMAGE_MODEL` environment variable.
+
+| Environment Variable | Default Value | Description |
+|---|---|---|
+| `IMAGE_MODEL` | `flux_dev` | The active image model backend |
+
+Example:
+```powershell
+$env:IMAGE_MODEL="flux_schnell"
+python run.py --mode server
+```
+
+---
+
 ## 🚀 Usage
 
 All operations go through the unified `run.py` entry point:
@@ -251,6 +283,7 @@ Start the server with `python run.py --mode server`, then:
 | `/styles` | GET | List available styles |
 | `/generate` | POST | Generate an image (form: `prompt`, `style`) |
 | `/debug/prompt` | GET | Debug structured prompt components (query: `prompt`, `style`) |
+| `/debug/model` | GET | Debug model backend configurations and active model |
 
 ### Example: Generate via API
 
