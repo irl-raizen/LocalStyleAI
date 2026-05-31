@@ -24,6 +24,7 @@ from src.utils.helpers import (
     get_dtype,
     get_logger,
 )
+from src.ai.prompt_enhancer import enhance_prompt
 
 logger = get_logger("api")
 
@@ -157,15 +158,23 @@ async def generate(prompt: str = Form(...), style: str = Form("default")):
 
         _load_lora(pipeline, style)
 
-        # Build full prompt
-        if style in STYLE_PROMPTS:
-            full_prompt = f"{STYLE_PROMPTS[style]}, {prompt}"
-            negative = STYLE_NEGATIVE_PROMPTS.get(style, "")
+        # Enhance prompt using local LLM via Ollama
+        enhanced = enhance_prompt(prompt=prompt, style=style)
+        
+        # Fallback to style prefixing if enhancer didn't change the prompt (e.g. on error)
+        if enhanced["enhanced_prompt"] == prompt:
+            if style in STYLE_PROMPTS:
+                full_prompt = f"{STYLE_PROMPTS[style]}, {prompt}"
+                negative = STYLE_NEGATIVE_PROMPTS.get(style, "")
+            else:
+                full_prompt = prompt
+                negative = enhanced["negative_prompt"]
         else:
-            full_prompt = prompt
-            negative = "blurry, low quality, deformed, ugly"
+            full_prompt = enhanced["enhanced_prompt"]
+            negative = enhanced["negative_prompt"]
 
         logger.info("Generating...")
+        logger.info("Generation started")
         result = pipeline(
             prompt=full_prompt,
             negative_prompt=negative or None,
@@ -175,6 +184,7 @@ async def generate(prompt: str = Form(...), style: str = Form("default")):
             num_inference_steps=30,
         )
         img = result.images[0]
+        logger.info("Generation completed")
 
         buf = BytesIO()
         img.save(buf, format="PNG")

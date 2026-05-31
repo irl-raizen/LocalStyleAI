@@ -138,6 +138,44 @@ pip install -r requirements.txt
 
 ---
 
+## 🧠 AI Prompt Intelligence Layer (Ollama)
+
+This project features an AI-powered prompt enhancement layer that expands simple, vague prompts into rich visual prompts using a local LLM via **Ollama**.
+
+### Setup Local LLM
+
+1. Install [Ollama](https://ollama.com).
+2. Download and run the default model (`qwen3:8b`):
+   ```bash
+   ollama run qwen3:8b
+   ```
+
+### How It Works
+
+When generating an image, the prompt is intercepted and sent to the local LLM along with the requested style. The LLM returns a structured JSON response containing:
+- **`enhanced_prompt`**: The original prompt expanded with visual details, lighting, composition, and style-appropriate elements.
+- **`negative_prompt`**: A style-appropriate negative prompt.
+
+If Ollama is unavailable or times out, the system automatically falls back to the original prompt and a default negative prompt to ensure image generation never crashes.
+
+### Configuration
+
+You can customize the connection to Ollama using the following environment variables:
+
+| Environment Variable | Default Value | Description |
+|---|---|---|
+| `OLLAMA_URL` | `http://localhost:11434/api/generate` | The Ollama API endpoint |
+| `OLLAMA_MODEL` | `qwen3:8b` | The local model to use for enhancement |
+| `OLLAMA_TIMEOUT` | `10.0` | Connection timeout in seconds |
+
+Example override (Windows):
+```powershell
+$env:OLLAMA_MODEL="llama3.2:1b"
+python run.py --mode server
+```
+
+---
+
 ## 🚀 Usage
 
 All operations go through the unified `run.py` entry point:

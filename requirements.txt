@@ -30,3 +30,6 @@ einops
 # Upscaling
 realesrgan
 basicsr
+
+# HTTP client
+requests

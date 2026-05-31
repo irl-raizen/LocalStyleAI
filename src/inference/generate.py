@@ -18,6 +18,7 @@ from src.utils.helpers import (
     get_logger,
     load_pipeline,
 )
+from src.ai.prompt_enhancer import enhance_prompt
 
 logger = get_logger("inference")
 
@@ -54,14 +55,21 @@ def generate_image(
     if pipe is None:
         pipe = load_pipeline(device=device)
 
-    # Build full prompt with style prefix
-    if style in STYLE_PROMPTS:
-        style_prefix = STYLE_PROMPTS[style]
-        full_prompt = f"{style_prefix}, {prompt}, high quality, best quality, detailed"
-        negative_prompt = STYLE_NEGATIVE_PROMPTS.get(style, "")
+    # Enhance prompt using local LLM via Ollama
+    enhanced = enhance_prompt(prompt=prompt, style=style)
+    
+    # Fallback to style prefixing if enhancer didn't change the prompt (e.g. on error)
+    if enhanced["enhanced_prompt"] == prompt:
+        if style in STYLE_PROMPTS:
+            style_prefix = STYLE_PROMPTS[style]
+            full_prompt = f"{style_prefix}, {prompt}, high quality, best quality, detailed"
+            negative_prompt = STYLE_NEGATIVE_PROMPTS.get(style, "")
+        else:
+            full_prompt = f"{prompt}, high quality, best quality, detailed"
+            negative_prompt = enhanced["negative_prompt"]
     else:
-        full_prompt = f"{prompt}, high quality, best quality, detailed"
-        negative_prompt = "blurry, low quality, deformed, ugly"
+        full_prompt = enhanced["enhanced_prompt"]
+        negative_prompt = enhanced["negative_prompt"]
 
     # Load LoRA weights if available
     lora_path = os.path.join(LORA_DIR, style)
@@ -75,6 +83,7 @@ def generate_image(
     logger.info("Generating — prompt: '%s...'", full_prompt[:60])
     logger.info("Negative: '%s'", negative_prompt)
 
+    logger.info("Generation started")
     result = pipe(
         prompt=full_prompt,
         negative_prompt=negative_prompt if negative_prompt else None,
@@ -84,6 +93,7 @@ def generate_image(
         width=width,
     )
     image = result.images[0]
+    logger.info("Generation completed")
 
     # Save if output path provided
     if output_path:
