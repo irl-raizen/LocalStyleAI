@@ -31,6 +31,7 @@ from src.ai.prompt_composer import compose_prompt
 logger = get_logger("api")
 
 from src.models.model_router import ModelRouter
+from src.memory.memory_engine import MemoryEngine
 
 # ---------------------------------------------------------------------------
 # App
@@ -86,6 +87,18 @@ async def health():
     """Health check endpoint."""
     return JSONResponse({"status": "ok", "gpu": torch.cuda.is_available()})
 
+
+@app.get("/memory", response_class=HTMLResponse)
+async def memory_ui():
+    """Serve the Memory Manager UI."""
+    for candidate in [
+        os.path.join(SCRIPT_DIR, "static", "memory.html"),
+        os.path.join(PROJECT_DIR, "api", "static", "memory.html"),
+    ]:
+        if os.path.exists(candidate):
+            with open(candidate, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>Memory UI not found.</h1>")
 
 @app.get("/styles")
 async def styles():
@@ -145,6 +158,49 @@ async def generate(prompt: str = Form(...), style: str = Form("default")):
         logger.error("Generation failed: %s", e, exc_info=True)
         return JSONResponse({"error": str(e)}, status_code=500)
 
+
+# ---------------------------------------------------------------------------
+# Memory Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/memory/characters")
+async def get_characters():
+    """Get all stored characters."""
+    engine = MemoryEngine()
+    return JSONResponse({"characters": engine.get_all_characters()})
+
+@app.get("/memory/characters/{name}")
+async def get_character(name: str):
+    """Get a specific stored character."""
+    engine = MemoryEngine()
+    char = engine.get_character(name)
+    if char:
+        return JSONResponse(char.model_dump())
+    return JSONResponse({"error": "Character not found"}, status_code=404)
+
+@app.delete("/memory/characters/{name}")
+async def delete_character(name: str):
+    """Delete a stored character."""
+    engine = MemoryEngine()
+    success = engine.delete_character(name)
+    if success:
+        return JSONResponse({"status": "success", "message": f"Deleted {name}"})
+    return JSONResponse({"error": "Character not found"}, status_code=404)
+
+@app.get("/memory/styles")
+async def get_styles():
+    """Get stored styles."""
+    engine = MemoryEngine()
+    style = engine.get_style()
+    if style:
+        return JSONResponse(style.model_dump())
+    return JSONResponse({"preferred_style": "default"})
+
+@app.get("/memory/scenes")
+async def get_scenes():
+    """Get all stored scenes."""
+    engine = MemoryEngine()
+    return JSONResponse({"scenes": engine.get_all_scenes()})
 
 # ---------------------------------------------------------------------------
 # Direct execution

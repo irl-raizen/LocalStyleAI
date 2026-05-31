@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Manager - LocalStyleAI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --primary-color: #6366f1;
+            --primary-hover: #4f46e5;
+            --danger-color: #ef4444;
+            --danger-hover: #dc2626;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: rgba(148, 163, 184, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 2rem;
+            background-image: radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
+                              radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.1) 0px, transparent 50%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0;
+        }
+
+        a.back-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .section-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        h2 {
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            color: #e2e8f0;
+            font-size: 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .item-card {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            position: relative;
+        }
+
+        .item-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            color: #fff;
+        }
+
+        .item-details {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.2rem;
+        }
+
+        .btn-delete {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: var(--danger-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .btn-delete:hover {
+            background: var(--danger-hover);
+        }
+
+        .empty-state {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-style: italic;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Memory Manager</h1>
+            <a href="/" class="back-link">&larr; Back to Generator</a>
+        </div>
+
+        <div class="section-card">
+            <h2>Saved Characters</h2>
+            <div id="characters-grid" class="grid">
+                <div class="empty-state">Loading characters...</div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <h2>Saved Scenes</h2>
+            <div id="scenes-grid" class="grid">
+                <div class="empty-state">Loading scenes...</div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <h2>Preferred Style</h2>
+            <div id="styles-content">
+                <div class="empty-state">Loading style...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchCharacters() {
+            try {
+                const res = await fetch('/memory/characters');
+                const data = await res.json();
+                const grid = document.getElementById('characters-grid');
+                grid.innerHTML = '';
+                
+                if (!data.characters || data.characters.length === 0) {
+                    grid.innerHTML = '<div class="empty-state">No characters saved yet. They will be auto-extracted from your prompts!</div>';
+                    return;
+                }
+
+                data.characters.forEach(char => {
+                    const card = document.createElement('div');
+                    card.className = 'item-card';
+                    card.innerHTML = `
+                        <div class="item-title">${char.name}</div>
+                        <button class="btn-delete" onclick="deleteCharacter('${char.name}')">Delete</button>
+                        ${char.age ? `<div class="item-details"><b>Age:</b> ${char.age}</div>` : ''}
+                        ${char.hair ? `<div class="item-details"><b>Hair:</b> ${char.hair}</div>` : ''}
+                        ${char.eyes ? `<div class="item-details"><b>Eyes:</b> ${char.eyes}</div>` : ''}
+                        ${char.clothing ? `<div class="item-details"><b>Clothing:</b> ${char.clothing}</div>` : ''}
+                        ${char.traits && char.traits.length > 0 ? `<div class="item-details"><b>Traits:</b> ${char.traits.join(', ')}</div>` : ''}
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function fetchScenes() {
+            try {
+                const res = await fetch('/memory/scenes');
+                const data = await res.json();
+                const grid = document.getElementById('scenes-grid');
+                grid.innerHTML = '';
+                
+                if (!data.scenes || data.scenes.length === 0) {
+                    grid.innerHTML = '<div class="empty-state">No scenes saved yet.</div>';
+                    return;
+                }
+
+                data.scenes.forEach(scene => {
+                    const card = document.createElement('div');
+                    card.className = 'item-card';
+                    card.innerHTML = `
+                        <div class="item-title">${scene.scene_name}</div>
+                        ${scene.environment ? `<div class="item-details"><b>Environment:</b> ${scene.environment}</div>` : ''}
+                        ${scene.lighting ? `<div class="item-details"><b>Lighting:</b> ${scene.lighting}</div>` : ''}
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function fetchStyles() {
+            try {
+                const res = await fetch('/memory/styles');
+                const data = await res.json();
+                const content = document.getElementById('styles-content');
+                
+                const styleName = data.preferred_style || "default";
+                content.innerHTML = `
+                    <div class="item-card" style="display: inline-block;">
+                        <div class="item-title">Style: ${styleName}</div>
+                        <div class="item-details">Automatically applied to prompts without a style selection.</div>
+                    </div>
+                `;
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function deleteCharacter(name) {
+            if (!confirm(`Are you sure you want to delete ${name}?`)) return;
+            try {
+                await fetch(`/memory/characters/${name}`, { method: 'DELETE' });
+                fetchCharacters();
+            } catch (e) {
+                alert('Failed to delete character.');
+            }
+        }
+
+        window.onload = () => {
+            fetchCharacters();
+            fetchScenes();
+            fetchStyles();
+        };
+    </script>
+</body>
+</html>

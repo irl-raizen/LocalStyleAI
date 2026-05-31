@@ -181,6 +181,20 @@ python run.py --mode server
 
 ---
 
+## 🧠 Memory Engine (Phase 4)
+
+LocalStyleAI features a persistent memory system that enriches prompts automatically using stored information.
+
+### Features
+1. **Character Memory**: When you describe a character in a prompt (e.g., *"Sarah, a 24-year-old woman with long red hair"*), the system uses Ollama to extract and securely save her traits. Future prompts can simply mention *"Sarah"* and the Memory Engine will automatically inject her stored physical attributes before generation.
+2. **Scene Memory**: Automatically maps scene keywords to their associated lighting and environments.
+3. **Style Memory**: Remembers your preferred style. If you don't explicitly specify a style for a prompt, the system will apply the last used style.
+4. **Auto-Recovery**: Corrupted memory JSON files are automatically detected, backed up, and safely reset so generations never crash.
+
+You can view and manage stored memories at the **Memory Manager UI**: `http://localhost:8000/memory`
+
+---
+
 ## 🖼️ Image Generation Models
 
 LocalStyleAI supports multiple backend models through a robust `ModelRouter`.
@@ -284,6 +298,11 @@ Start the server with `python run.py --mode server`, then:
 | `/generate` | POST | Generate an image (form: `prompt`, `style`) |
 | `/debug/prompt` | GET | Debug structured prompt components (query: `prompt`, `style`) |
 | `/debug/model` | GET | Debug model backend configurations and active model |
+| `/memory` | GET | Memory Manager Web UI |
+| `/memory/characters` | GET | Get all stored characters |
+| `/memory/characters/{name}`| DELETE| Delete a stored character |
+| `/memory/scenes` | GET | Get all stored scenes |
+| `/memory/styles` | GET | Get stored styles |
 
 ### Example: Generate via API
 

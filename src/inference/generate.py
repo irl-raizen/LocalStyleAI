@@ -21,6 +21,7 @@ from src.models.model_router import ModelRouter
 from src.ai.prompt_enhancer import enhance_prompt, DEFAULT_NEGATIVE_PROMPT
 from src.ai.prompt_structurer import structure_prompt
 from src.ai.prompt_composer import compose_prompt
+from src.memory.memory_engine import MemoryEngine
 
 logger = get_logger("inference")
 
@@ -60,6 +61,10 @@ def generate_image(
     else:
         router = pipe
         backend = router.get_active_backend()
+
+    # Phase 4: Memory Injection
+    memory_engine = MemoryEngine()
+    prompt, style = memory_engine.inject_memory(prompt, style)
 
     # Phase 2: Structured Prompt Extraction
     structured = structure_prompt(prompt=prompt, style=style)
