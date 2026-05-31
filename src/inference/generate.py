@@ -18,7 +18,9 @@ from src.utils.helpers import (
     get_logger,
     load_pipeline,
 )
-from src.ai.prompt_enhancer import enhance_prompt
+from src.ai.prompt_enhancer import enhance_prompt, DEFAULT_NEGATIVE_PROMPT
+from src.ai.prompt_structurer import structure_prompt
+from src.ai.prompt_composer import compose_prompt
 
 logger = get_logger("inference")
 
@@ -55,21 +57,30 @@ def generate_image(
     if pipe is None:
         pipe = load_pipeline(device=device)
 
-    # Enhance prompt using local LLM via Ollama
-    enhanced = enhance_prompt(prompt=prompt, style=style)
+    # Phase 2: Structured Prompt Extraction
+    structured = structure_prompt(prompt=prompt, style=style)
     
-    # Fallback to style prefixing if enhancer didn't change the prompt (e.g. on error)
-    if enhanced["enhanced_prompt"] == prompt:
-        if style in STYLE_PROMPTS:
-            style_prefix = STYLE_PROMPTS[style]
-            full_prompt = f"{style_prefix}, {prompt}, high quality, best quality, detailed"
-            negative_prompt = STYLE_NEGATIVE_PROMPTS.get(style, "")
-        else:
-            full_prompt = f"{prompt}, high quality, best quality, detailed"
-            negative_prompt = enhanced["negative_prompt"]
+    if structured is not None:
+        logger.info("Structured prompt extracted: %s", structured.model_dump())
+        full_prompt = compose_prompt(structured)
+        negative_prompt = STYLE_NEGATIVE_PROMPTS.get(style, DEFAULT_NEGATIVE_PROMPT)
     else:
-        full_prompt = enhanced["enhanced_prompt"]
-        negative_prompt = enhanced["negative_prompt"]
+        # Fall back to Phase 1 enhanced prompt system
+        logger.info("Structured prompt extraction failed, falling back to Phase 1 prompt enhancer.")
+        enhanced = enhance_prompt(prompt=prompt, style=style)
+        
+        # Keep original style prefixing fallback logic if Phase 1 also fell back
+        if enhanced["enhanced_prompt"] == prompt:
+            if style in STYLE_PROMPTS:
+                style_prefix = STYLE_PROMPTS[style]
+                full_prompt = f"{style_prefix}, {prompt}, high quality, best quality, detailed"
+                negative_prompt = STYLE_NEGATIVE_PROMPTS.get(style, "")
+            else:
+                full_prompt = f"{prompt}, high quality, best quality, detailed"
+                negative_prompt = enhanced["negative_prompt"]
+        else:
+            full_prompt = enhanced["enhanced_prompt"]
+            negative_prompt = enhanced["negative_prompt"]
 
     # Load LoRA weights if available
     lora_path = os.path.join(LORA_DIR, style)

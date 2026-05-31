@@ -24,7 +24,9 @@ from src.utils.helpers import (
     get_dtype,
     get_logger,
 )
-from src.ai.prompt_enhancer import enhance_prompt
+from src.ai.prompt_enhancer import enhance_prompt, DEFAULT_NEGATIVE_PROMPT
+from src.ai.prompt_structurer import structure_prompt
+from src.ai.prompt_composer import compose_prompt
 
 logger = get_logger("api")
 
@@ -149,6 +151,33 @@ async def styles():
     return JSONResponse({"styles": AVAILABLE_STYLES})
 
 
+@app.get("/debug/prompt")
+async def debug_prompt(prompt: str, style: str = "default"):
+    """Debug endpoint to inspect structured prompt extraction and composition."""
+    logger.info("Prompt received: '%s' (style: '%s')", prompt, style)
+    
+    structured = structure_prompt(prompt=prompt, style=style)
+    if structured is not None:
+        logger.info("Structured prompt extracted: %s", structured.model_dump())
+        composed = compose_prompt(structured)
+        logger.info("Composed prompt generated: '%s'", composed)
+        negative = STYLE_NEGATIVE_PROMPTS.get(style, DEFAULT_NEGATIVE_PROMPT)
+        return JSONResponse({
+            "structured": structured.model_dump(),
+            "composed_prompt": composed,
+            "negative_prompt": negative
+        })
+    else:
+        logger.info("Structured prompt extraction failed, falling back to Phase 1 prompt enhancer.")
+        enhanced = enhance_prompt(prompt=prompt, style=style)
+        logger.info("Composed prompt generated: '%s'", enhanced["enhanced_prompt"])
+        return JSONResponse({
+            "structured": {},
+            "composed_prompt": enhanced["enhanced_prompt"],
+            "negative_prompt": enhanced["negative_prompt"]
+        })
+
+
 @app.post("/generate")
 async def generate(prompt: str = Form(...), style: str = Form("default")):
     """Generate an image from a text prompt with an optional style."""
@@ -158,20 +187,30 @@ async def generate(prompt: str = Form(...), style: str = Form("default")):
 
         _load_lora(pipeline, style)
 
-        # Enhance prompt using local LLM via Ollama
-        enhanced = enhance_prompt(prompt=prompt, style=style)
+        # Phase 2: Structured Prompt Extraction
+        structured = structure_prompt(prompt=prompt, style=style)
         
-        # Fallback to style prefixing if enhancer didn't change the prompt (e.g. on error)
-        if enhanced["enhanced_prompt"] == prompt:
-            if style in STYLE_PROMPTS:
-                full_prompt = f"{STYLE_PROMPTS[style]}, {prompt}"
-                negative = STYLE_NEGATIVE_PROMPTS.get(style, "")
-            else:
-                full_prompt = prompt
-                negative = enhanced["negative_prompt"]
+        if structured is not None:
+            logger.info("Structured prompt extracted: %s", structured.model_dump())
+            full_prompt = compose_prompt(structured)
+            logger.info("Composed prompt generated: '%s'", full_prompt)
+            negative = STYLE_NEGATIVE_PROMPTS.get(style, DEFAULT_NEGATIVE_PROMPT)
         else:
-            full_prompt = enhanced["enhanced_prompt"]
-            negative = enhanced["negative_prompt"]
+            # Fall back to Phase 1 enhanced prompt system
+            logger.info("Structured prompt extraction failed, falling back to Phase 1 prompt enhancer.")
+            enhanced = enhance_prompt(prompt=prompt, style=style)
+            
+            # Keep original style prefixing fallback logic if Phase 1 also fell back
+            if enhanced["enhanced_prompt"] == prompt:
+                if style in STYLE_PROMPTS:
+                    full_prompt = f"{STYLE_PROMPTS[style]}, {prompt}"
+                    negative = STYLE_NEGATIVE_PROMPTS.get(style, "")
+                else:
+                    full_prompt = prompt
+                    negative = enhanced["negative_prompt"]
+            else:
+                full_prompt = enhanced["enhanced_prompt"]
+                negative = enhanced["negative_prompt"]
 
         logger.info("Generating...")
         logger.info("Generation started")
